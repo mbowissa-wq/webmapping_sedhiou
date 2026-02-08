@@ -1,0 +1,971 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="css/leaflet.css">
+        <link rel="stylesheet" href="css/L.Control.Locate.min.css">
+        <link rel="stylesheet" href="css/qgis2web.css">
+        <link rel="stylesheet" href="css/fontawesome-all.min.css">
+        <link rel="stylesheet" href="css/MarkerCluster.css">
+        <link rel="stylesheet" href="css/MarkerCluster.Default.css">
+        <link rel="stylesheet" href="css/leaflet.photon.css">
+        <link rel="stylesheet" href="css/leaflet-measure.css">
+        <link rel="stylesheet" href="css/style.css"> <!-- Ajout du nouveau fichier CSS -->
+        <style>
+        /* Styles spécifiques au panneau des couches */
+        #layer-control-container .leaflet-control-layers-list {
+            max-height: calc(100vh - 150px);
+            overflow-y: auto;
+        }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar">
+            <ul class="navbar-nav">
+                <li class="nav-item"><a href="#" id="home-btn" class="nav-link">Accueil</a></li>
+                <li class="nav-item"><a href="#" id="about-btn" class="nav-link">A propos</a></li>
+                <li class="nav-item"><a href="#" id="catalog-btn" class="nav-link">Catalogue</a></li>
+                <li class="nav-item"><a href="#" id="spatial-query-btn" class="nav-link">Requête Spatiale</a></li>
+                <li class="nav-item"><a href="#" id="attribute-query-btn" class="nav-link">Requête Attributaire</a></li>
+                <li class="nav-item"><a href="#" id="download-btn" class="nav-link">Télécharger</a></li>                <li class="nav-item"><a href="#" id="print-btn" class="nav-link">Imprimer</a></li>
+                <li class="nav-item">
+                    <div id="geocoder-container" class="leaflet-photon">
+                        <input class="photon-input" placeholder="Rechercher une localité...">
+                    </div>
+                </li>
+            </ul>
+        </nav>
+
+        <div id="map">
+            <div id="map-tools" class="leaflet-bar leaflet-control">
+                <a id="zoom-in-tool-btn" class="leaflet-control-zoom-in" href="#" title="Zoom avant" role="button" aria-label="Zoom avant">+</a>
+                <a id="zoom-out-tool-btn" class="leaflet-control-zoom-out" href="#" title="Zoom arrière" role="button" aria-label="Zoom arrière">&#x2212;</a>
+                <a id="measure-tool-btn" class="leaflet-control-custom" href="#" title="Mesurer" role="button" aria-label="Mesurer"><i class="fa fa-ruler"></i></a>
+                <a id="locate-tool-btn" class="leaflet-control-custom" href="#" title="Ma position" role="button" aria-label="Ma position"><i class="fa fa-map-marker"></i></a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div id="coords-container">Coordonnées:</div>
+            <div id="scale-container"></div>
+        </div>
+
+        <!-- Modal -->
+        <div id="about-modal" class="modal">
+            <div class="modal-content" style="width: 50%;">
+                <div class="modal-header">
+                    <span class="close-button">&times;</span>
+                    <h2>A Propos</h2>
+                </div>
+                <p>Cette application cartographique de la région de Sédhiou a été développée dans un but éducatif et de démonstration.</p>
+                <p>Elle intègre diverses fonctionnalités SIG modernes pour l'exploration et l'analyse des données géospatiales de la région.</p>
+            </div>
+        </div>
+
+        <script src="js/qgis2web_expressions.js"></script>
+        <script src="js/leaflet.js"></script>
+        <script src="js/L.Control.Locate.min.js"></script>
+        <script src="js/leaflet.rotatedMarker.js"></script>
+        <script src="js/leaflet.pattern.js"></script>
+        <script src="js/leaflet-hash.js"></script>
+        <script src="js/Autolinker.min.js"></script>
+        <script src="js/rbush.min.js"></script>
+        <script src="js/labelgun.min.js"></script>
+        <script src="js/labels.js"></script>
+        <script src="js/leaflet.photon.js"></script>
+        <script src="js/leaflet-measure.js"></script>
+        <script src="data/Sedhiou_1.js"></script>
+        <script src="https://unpkg.com/leaflet.browser.print/dist/leaflet.browser.print.min.js"></script>
+        <script src="https://unpkg.com/leaflet-minimap@3.6.1/dist/Control.MiniMap.min.js"></script>
+        <script src="js/leaflet.markercluster.js"></script>
+        <script src="data/Departement_sedhiou_2.js"></script>
+        <script src="data/Arrondissement_sedhiou_3.js"></script>
+        <script src="data/Hydrographie_sedhiou_4.js"></script>
+        <script src="data/Route_sedhiou_5.js"></script>
+        <script src="data/Localite_sedhiou_6.js"></script>
+        <script src="data/Ecole_sedhiou_7.js"></script>
+        <script>
+        // --- MODAL LOGIC ---
+        var modal = document.getElementById("about-modal");
+        var aboutBtn = document.getElementById("about-btn");
+        var span = document.getElementsByClassName("close-button")[0];
+
+        var highlightLayer;
+        function highlightFeature(e) {
+            highlightLayer = e.target;
+
+            if (e.target.feature.geometry.type === 'LineString' || e.target.feature.geometry.type === 'MultiLineString') {
+              highlightLayer.setStyle({
+                color: '#ffff00',
+              });
+            } else {
+              highlightLayer.setStyle({
+                fillColor: '#ffff00',
+                fillOpacity: 1
+              });
+            }
+            highlightLayer.openPopup();
+        }
+        var map = L.map('map', {
+            zoomControl:false, maxZoom:20, minZoom:7
+        }).fitBounds([[12.416864644976814,-16.464926034426725],[13.43592465617681,-14.529668877007012]]);
+        var hash = new L.Hash(map);
+        map.attributionControl.setPrefix('<a href="https://github.com/tomchadwin/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
+        var autolinker = new Autolinker({truncate: {length: 30, location: 'smart'}});
+        // remove popup's row if "visible-with-data"
+        function removeEmptyRowsFromPopupContent(content, feature) {
+         var tempDiv = document.createElement('div');
+         tempDiv.innerHTML = content;
+         var rows = tempDiv.querySelectorAll('tr');
+         for (var i = 0; i < rows.length; i++) {
+             var td = rows[i].querySelector('td.visible-with-data');
+             var key = td ? td.id : '';
+             if (td && td.classList.contains('visible-with-data') && feature.properties[key] == null) {
+                 rows[i].parentNode.removeChild(rows[i]);
+             }
+         }
+         return tempDiv.innerHTML;
+        }
+        // modify popup if contains media
+        function addClassToPopupIfMedia(content, popup) {
+            var tempDiv = document.createElement('div');
+            tempDiv.innerHTML = content;
+            var imgTd = tempDiv.querySelector('td img');
+            if (imgTd) {
+                var src = imgTd.getAttribute('src');
+                if (/\.(jpg|jpeg|png|gif|bmp|webp|avif)$/i.test(src)) {
+                    popup._contentNode.classList.add('media');
+                    setTimeout(function() {
+                        popup.update();
+                    }, 10);
+                } else if (/\.(mp3|wav|ogg|aac)$/i.test(src)) {
+                    var audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.src = src;
+                    imgTd.parentNode.replaceChild(audio, imgTd);
+                    popup._contentNode.classList.add('media');
+                    setTimeout(function() {
+                        popup.setContent(tempDiv.innerHTML);
+                        popup.update();
+                    }, 10);
+                } else if (/\.(mp4|webm|ogg|mov)$/i.test(src)) {
+                    var video = document.createElement('video');
+                    video.controls = true;
+                    video.src = src;
+                    video.style.width = "400px";
+                    video.style.height = "300px";
+                    video.style.maxHeight = "60vh";
+                    video.style.maxWidth = "60vw";
+                    imgTd.parentNode.replaceChild(video, imgTd);
+                    popup._contentNode.classList.add('media');
+                    // Aggiorna il popup quando il video carica i metadati
+                    video.addEventListener('loadedmetadata', function() {
+                        popup.update();
+                    });
+                    setTimeout(function() {
+                        popup.setContent(tempDiv.innerHTML);
+                        popup.update();
+                    }, 10);
+                } else {
+                    popup._contentNode.classList.remove('media');
+                }
+            } else {
+                popup._contentNode.classList.remove('media');
+            }
+        }
+        var bounds_group = new L.featureGroup([]);
+        function setBounds() {
+            // map.setMaxBounds(map.getBounds()); // Désactivé pour une meilleure expérience utilisateur
+            // map.setMinZoom(map.getZoom());
+        }
+        map.createPane('pane_GoogleSatelliteHybrid_0');
+        map.getPane('pane_GoogleSatelliteHybrid_0').style.zIndex = 400;
+        var layer_GoogleSatelliteHybrid_0 = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+            pane: 'pane_GoogleSatelliteHybrid_0',
+            opacity: 1.0,
+            attribution: '',
+            minZoom: 1,
+            maxZoom: 20,
+            minNativeZoom: 0,
+            maxNativeZoom: 19
+        });
+        layer_GoogleSatelliteHybrid_0;
+
+        var layer_OSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            pane: 'pane_GoogleSatelliteHybrid_0',
+            opacity: 1.0,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            minZoom: 1,
+            maxZoom: 20
+        });
+
+        map.addLayer(layer_OSM);
+
+        var baseMaps = {
+            "OpenStreetMap": layer_OSM,
+            "Google Satellite": layer_GoogleSatelliteHybrid_0
+        };
+
+        function pop_Sedhiou_1(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2"><strong>Région</strong><br />' + (feature.properties['Région'] !== null ? autolinker.link(String(feature.properties['Région']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Sedhiou_1_0() {
+            return {
+                pane: 'pane_Sedhiou_1',
+                opacity: 1,
+                color: 'rgba(228,26,28,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 8.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+        }
+        map.createPane('pane_Sedhiou_1');
+        map.getPane('pane_Sedhiou_1').style.zIndex = 401;
+        map.getPane('pane_Sedhiou_1').style['mix-blend-mode'] = 'normal';
+        var layer_Sedhiou_1 = new L.geoJson(json_Sedhiou_1, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Sedhiou_1',
+            layerName: 'layer_Sedhiou_1',
+            pane: 'pane_Sedhiou_1',
+            onEachFeature: pop_Sedhiou_1,
+            style: style_Sedhiou_1_0,
+        });
+        bounds_group.addLayer(layer_Sedhiou_1);
+        map.addLayer(layer_Sedhiou_1);
+        function pop_Departement_sedhiou_2(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2"><strong>reg</strong><br />' + (feature.properties['reg'] !== null ? autolinker.link(String(feature.properties['reg']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2"><strong>dept</strong><br />' + (feature.properties['dept'] !== null ? autolinker.link(String(feature.properties['dept']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Departement_sedhiou_2_0() {
+            return {
+                pane: 'pane_Departement_sedhiou_2',
+                opacity: 1,
+                color: 'rgba(255,127,0,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 6.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+        }
+        map.createPane('pane_Departement_sedhiou_2');
+        map.getPane('pane_Departement_sedhiou_2').style.zIndex = 402;
+        map.getPane('pane_Departement_sedhiou_2').style['mix-blend-mode'] = 'normal';
+        var layer_Departement_sedhiou_2 = new L.geoJson(json_Departement_sedhiou_2, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Departement_sedhiou_2',
+            layerName: 'layer_Departement_sedhiou_2',
+            pane: 'pane_Departement_sedhiou_2',
+            onEachFeature: pop_Departement_sedhiou_2,
+            style: style_Departement_sedhiou_2_0,
+        });
+        bounds_group.addLayer(layer_Departement_sedhiou_2);
+        map.addLayer(layer_Departement_sedhiou_2);
+        function pop_Arrondissement_sedhiou_3(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2"><strong>reg</strong><br />' + (feature.properties['reg'] !== null ? autolinker.link(String(feature.properties['reg']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2"><strong>dept</strong><br />' + (feature.properties['dept'] !== null ? autolinker.link(String(feature.properties['dept']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2"><strong>arr</strong><br />' + (feature.properties['arr'] !== null ? autolinker.link(String(feature.properties['arr']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Arrondissement_sedhiou_3_0() {
+            return {
+                pane: 'pane_Arrondissement_sedhiou_3',
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+        }
+        map.createPane('pane_Arrondissement_sedhiou_3');
+        map.getPane('pane_Arrondissement_sedhiou_3').style.zIndex = 403;
+        map.getPane('pane_Arrondissement_sedhiou_3').style['mix-blend-mode'] = 'normal';
+        var layer_Arrondissement_sedhiou_3 = new L.geoJson(json_Arrondissement_sedhiou_3, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Arrondissement_sedhiou_3',
+            layerName: 'layer_Arrondissement_sedhiou_3',
+            pane: 'pane_Arrondissement_sedhiou_3',
+            onEachFeature: pop_Arrondissement_sedhiou_3,
+            style: style_Arrondissement_sedhiou_3_0,
+        });
+        bounds_group.addLayer(layer_Arrondissement_sedhiou_3);
+        map.addLayer(layer_Arrondissement_sedhiou_3);
+        function pop_Hydrographie_sedhiou_4(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['OBJECTID'] !== null ? autolinker.link(String(feature.properties['OBJECTID']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['FNODE_'] !== null ? autolinker.link(String(feature.properties['FNODE_']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['TNODE_'] !== null ? autolinker.link(String(feature.properties['TNODE_']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['LPOLY_'] !== null ? autolinker.link(String(feature.properties['LPOLY_']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['RPOLY_'] !== null ? autolinker.link(String(feature.properties['RPOLY_']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['LENGTH'] !== null ? autolinker.link(String(feature.properties['LENGTH']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['HYDROLA3_'] !== null ? autolinker.link(String(feature.properties['HYDROLA3_']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['HYDROLA3_I'] !== null ? autolinker.link(String(feature.properties['HYDROLA3_I']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['CODE'] !== null ? autolinker.link(String(feature.properties['CODE']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['NOM'] !== null ? autolinker.link(String(feature.properties['NOM']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['LIBELLE'] !== null ? autolinker.link(String(feature.properties['LIBELLE']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Shape_Leng'] !== null ? autolinker.link(String(feature.properties['Shape_Leng']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Hydrographie_sedhiou_4_0() {
+            return {
+                pane: 'pane_Hydrographie_sedhiou_4',
+                opacity: 1,
+                color: 'rgba(100,152,210,1.0)',
+                dashArray: '',
+                lineCap: 'round',
+                lineJoin: 'round',
+                weight: 3.0,
+                fillOpacity: 0,
+                interactive: false,
+            }
+        }
+        map.createPane('pane_Hydrographie_sedhiou_4');
+        map.getPane('pane_Hydrographie_sedhiou_4').style.zIndex = 404;
+        map.getPane('pane_Hydrographie_sedhiou_4').style['mix-blend-mode'] = 'normal';
+        var layer_Hydrographie_sedhiou_4 = new L.geoJson(json_Hydrographie_sedhiou_4, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_Hydrographie_sedhiou_4',
+            layerName: 'layer_Hydrographie_sedhiou_4',
+            pane: 'pane_Hydrographie_sedhiou_4',
+            onEachFeature: pop_Hydrographie_sedhiou_4,
+            style: style_Hydrographie_sedhiou_4_0,
+        });
+        bounds_group.addLayer(layer_Hydrographie_sedhiou_4);
+        map.addLayer(layer_Hydrographie_sedhiou_4);
+        function pop_Route_sedhiou_5(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['FNODE_'] !== null ? autolinker.link(String(feature.properties['FNODE_']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['TNODE_'] !== null ? autolinker.link(String(feature.properties['TNODE_']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['LPOLY_'] !== null ? autolinker.link(String(feature.properties['LPOLY_']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['RPOLY_'] !== null ? autolinker.link(String(feature.properties['RPOLY_']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['LONGUEUR'] !== null ? autolinker.link(String(feature.properties['LONGUEUR']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['ROUTESA3_'] !== null ? autolinker.link(String(feature.properties['ROUTESA3_']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['ROUTESA3_I'] !== null ? autolinker.link(String(feature.properties['ROUTESA3_I']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['CODE'] !== null ? autolinker.link(String(feature.properties['CODE']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['FONCTION'] !== null ? autolinker.link(String(feature.properties['FONCTION']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Route_sedhiou_5_0(feature) {
+            switch(String(feature.properties['FONCTION'])) {
+                case 'Autres pistes':
+                    return {
+                pane: 'pane_Route_sedhiou_5',
+                opacity: 1,
+                color: 'rgba(84,176,74,1.0)',
+                dashArray: '',
+                lineCap: 'round',
+                lineJoin: 'round',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: false,
+            }
+                    break;
+                case 'Autres routes':
+                    return {
+                pane: 'pane_Route_sedhiou_5',
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'round',
+                lineJoin: 'round',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: false,
+            }
+                    break;
+                case 'Piste automobile':
+                    return {
+                pane: 'pane_Route_sedhiou_5',
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'round',
+                lineJoin: 'round',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: false,
+            }
+                    break;
+                case 'Route principale':
+                    return {
+                pane: 'pane_Route_sedhiou_5',
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'round',
+                lineJoin: 'round',
+                weight: 4.0,
+                fillOpacity: 0,
+                interactive: false,
+            }
+                    break;
+                case 'Route principale à 2 voies':
+                    return {
+                pane: 'pane_Route_sedhiou_5',
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'round',
+                lineJoin: 'round',
+                weight: 6.0,
+                fillOpacity: 0,
+                interactive: false,
+            }
+                    break;
+            }
+        }
+        map.createPane('pane_Route_sedhiou_5');
+        map.getPane('pane_Route_sedhiou_5').style.zIndex = 405;
+        map.getPane('pane_Route_sedhiou_5').style['mix-blend-mode'] = 'normal';
+        var layer_Route_sedhiou_5 = new L.geoJson(json_Route_sedhiou_5, {
+            attribution: '',
+            interactive: false,
+            dataVar: 'json_Route_sedhiou_5',
+            layerName: 'layer_Route_sedhiou_5',
+            pane: 'pane_Route_sedhiou_5',
+            onEachFeature: pop_Route_sedhiou_5,
+            style: style_Route_sedhiou_5_0,
+        });
+        bounds_group.addLayer(layer_Route_sedhiou_5);
+        map.addLayer(layer_Route_sedhiou_5);
+        function pop_Localite_sedhiou_6(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['ENTITY'] !== null ? autolinker.link(String(feature.properties['ENTITY']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td class="visible-with-data" id="COLOR" colspan="2"><strong>COLOR</strong><br />' + (feature.properties['COLOR'] !== null ? autolinker.link(String(feature.properties['COLOR']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td class="visible-with-data" id="NOM" colspan="2"><strong>NOM</strong><br />' + (feature.properties['NOM'] !== null ? autolinker.link(String(feature.properties['NOM']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2"><strong>NUM_VILLAG</strong><br />' + (feature.properties['NUM_VILLAG'] !== null ? autolinker.link(String(feature.properties['NUM_VILLAG']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Localite_sedhiou_6_0() {
+            return {
+                pane: 'pane_Localite_sedhiou_6',
+                radius: 4.0,
+                opacity: 1,
+                color: 'rgba(255,255,255,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(0,0,0,1.0)',
+                interactive: true,
+            }
+        }
+        map.createPane('pane_Localite_sedhiou_6');
+        map.getPane('pane_Localite_sedhiou_6').style.zIndex = 406;
+        map.getPane('pane_Localite_sedhiou_6').style['mix-blend-mode'] = 'normal';
+        var layer_Localite_sedhiou_6 = new L.geoJson(json_Localite_sedhiou_6, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Localite_sedhiou_6',
+            layerName: 'layer_Localite_sedhiou_6',
+            pane: 'pane_Localite_sedhiou_6',
+            onEachFeature: pop_Localite_sedhiou_6,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.circleMarker(latlng, style_Localite_sedhiou_6_0(feature));
+            },
+        });
+        var cluster_Localite_sedhiou_6 = new L.MarkerClusterGroup({showCoverageOnHover: false,
+            spiderfyDistanceMultiplier: 2});
+        cluster_Localite_sedhiou_6.addLayer(layer_Localite_sedhiou_6);
+
+        bounds_group.addLayer(layer_Localite_sedhiou_6);
+        cluster_Localite_sedhiou_6.addTo(map);
+        function pop_Ecole_sedhiou_7(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                    if (typeof layer.closePopup == 'function') {
+                        layer.closePopup();
+                    } else {
+                        layer.eachLayer(function(feature){
+                            feature.closePopup()
+                        });
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2"><strong>Nom</strong><br />' + (feature.properties['Nom'] !== null ? autolinker.link(String(feature.properties['Nom']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Ecole_sedhiou_7_0(feature) {
+            switch(String(feature.properties['Nom'])) {
+                case 'Ecole Coranique Dahara Moderne':
+                    return {
+                pane: 'pane_Ecole_sedhiou_7',
+                radius: 5.999999999999998,
+                opacity: 1,
+                color: 'rgba(255,255,255,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(227,26,28,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'École Tambanaba':
+                    return {
+                pane: 'pane_Ecole_sedhiou_7',
+                radius: 5.999999999999998,
+                opacity: 1,
+                color: 'rgba(128,67,36,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(172,91,49,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Lycée':
+                    return {
+                pane: 'pane_Ecole_sedhiou_7',
+                radius: 5.9999999999999964,
+                opacity: 1,
+                color: 'rgba(61,128,53,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(84,176,74,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Marsassoum Elementary School':
+                    return {
+                pane: 'pane_Ecole_sedhiou_7',
+                radius: 5.999999999999999,
+                opacity: 1,
+                color: 'rgba(179,93,142,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(242,125,191,1.0)',
+                interactive: true,
+            }
+                    break;
+                case 'Sillacounda Ecole Elementaire':
+                    return {
+                pane: 'pane_Ecole_sedhiou_7',
+                radius: 5.999999999999998,
+                opacity: 1,
+                color: 'rgba(117,58,128,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(149,74,162,1.0)',
+                interactive: true,
+            }
+                    break;
+            }
+        }
+        map.createPane('pane_Ecole_sedhiou_7');
+        map.getPane('pane_Ecole_sedhiou_7').style.zIndex = 407;
+        map.getPane('pane_Ecole_sedhiou_7').style['mix-blend-mode'] = 'normal';
+        var layer_Ecole_sedhiou_7 = new L.geoJson(json_Ecole_sedhiou_7, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Ecole_sedhiou_7',
+            layerName: 'layer_Ecole_sedhiou_7',
+            pane: 'pane_Ecole_sedhiou_7',
+            onEachFeature: pop_Ecole_sedhiou_7,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.circleMarker(latlng, style_Ecole_sedhiou_7_0(feature));
+            },
+        });
+        var cluster_Ecole_sedhiou_7 = new L.MarkerClusterGroup({showCoverageOnHover: false,
+            spiderfyDistanceMultiplier: 2});
+        cluster_Ecole_sedhiou_7.addLayer(layer_Ecole_sedhiou_7);
+
+        bounds_group.addLayer(layer_Ecole_sedhiou_7);
+        cluster_Ecole_sedhiou_7.addTo(map);
+        setBounds();
+        var i = 0;
+        layer_Arrondissement_sedhiou_3.eachLayer(function(layer) {
+            var context = {
+                feature: layer.feature,
+                variables: {}
+            };
+            layer.bindTooltip((layer.feature.properties['arr'] !== null?String('<div style="color: #323232; font-size: 12pt; font-weight: bold; font-family: \'Times New Roman\', sans-serif;">' + layer.feature.properties['arr']) + '</div>':''), {permanent: true, offset: [-0, -16], className: 'css_Arrondissement_sedhiou_3'});
+            labels.push(layer);
+            totalMarkers += 1;
+              layer.added = true;
+              addLabel(layer, i);
+              i++;
+        });
+        var i = 0;
+        layer_Ecole_sedhiou_7.eachLayer(function(layer) {
+            var context = {
+                feature: layer.feature,
+                variables: {}
+            };
+            layer.bindTooltip((layer.feature.properties['Nom'] !== null?String('<div style="color: #323232; font-size: 12pt; font-family: \'Arial Black\', sans-serif;">' + layer.feature.properties['Nom']) + '</div>':''), {permanent: true, offset: [-0, -16], className: 'css_Ecole_sedhiou_7'});
+            labels.push(layer);
+            totalMarkers += 1;
+              layer.added = true;
+              addLabel(layer, i);
+              i++;
+        });
+        resetLabels([layer_Arrondissement_sedhiou_3,layer_Ecole_sedhiou_7]);
+        map.on("zoomend", function(){
+            resetLabels([layer_Arrondissement_sedhiou_3,layer_Ecole_sedhiou_7]);
+        });
+        map.on("layeradd", function(){
+            resetLabels([layer_Arrondissement_sedhiou_3,layer_Ecole_sedhiou_7]);
+        });
+        map.on("layerremove", function(){
+            resetLabels([layer_Arrondissement_sedhiou_3,layer_Ecole_sedhiou_7]);
+        });
+
+        // --- NOUVELLES FONCTIONNALITÉS ---
+
+        // 1. Contrôle des couches et de la légende
+        var overlayLayers = {
+            "Région de Sédhiou": layer_Sedhiou_1,
+            "Départements": layer_Departement_sedhiou_2,
+            "Arrondissements": layer_Arrondissement_sedhiou_3,
+            "Routes": layer_Route_sedhiou_5,
+            "Hydrographie": layer_Hydrographie_sedhiou_4,
+            "Ecoles": cluster_Ecole_sedhiou_7,
+            "Localités": cluster_Localite_sedhiou_6
+        };
+
+        var layerControl = L.control.layers(baseMaps, overlayLayers, { collapsed: true }).addTo(map);
+        var layerControlContainer = layerControl.getContainer();
+
+        // Inverser l'ordre des sections dans le contrôle des couches
+        var baseLayersDiv = layerControlContainer.querySelector('.leaflet-control-layers-base');
+        var overlaysDiv = layerControlContainer.querySelector('.leaflet-control-layers-overlays');
+        var form = layerControlContainer.querySelector('form');
+        form.insertBefore(overlaysDiv, baseLayersDiv); // Déplace les couches superposées avant les fonds de carte
+
+        // 3. Barre de coordonnées et échelle
+        L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
+        document.getElementById('scale-container').appendChild(
+            document.querySelector('.leaflet-control-scale')
+        );
+
+        var coordsContainer = document.getElementById('coords-container');
+        map.on('mousemove', function(e) {
+            coordsContainer.innerHTML = "Coordonnées: " + 
+                e.latlng.lat.toFixed(6) + ", " + e.latlng.lng.toFixed(6);
+        });
+
+        // 5. Logique de la barre de navigation
+        document.getElementById('zoom-in-tool-btn').addEventListener('click', function() { map.zoomIn(); });
+        document.getElementById('zoom-out-tool-btn').addEventListener('click', function() { map.zoomOut(); });
+        document.getElementById('home-btn').addEventListener('click', function() { 
+            map.fitBounds([[12.416864644976814,-16.464926034426725],[13.43592465617681,-14.529668877007012]]);
+        });
+        
+        var measureControl = new L.Control.Measure({
+            position: 'topright', // La position n'a plus d'importance car on le déplace
+            primaryLengthUnit: 'meters',
+            secondaryLengthUnit: 'kilometers',
+            primaryAreaUnit: 'sqmeters',
+            secondaryAreaUnit: 'hectares'
+        });
+        measureControl.addTo(map);
+        // Cacher le contrôle de mesure par défaut
+        var measureContainer = measureControl.getContainer();
+        measureContainer.style.display = 'none';
+        document.getElementById('measure-tool-btn').addEventListener('click', function() {
+            measureContainer.querySelector('.js-toggle').click();
+        });
+
+        // Ajout du contrôle de géolocalisation
+        var locateControl = L.control.locate({
+            position: 'topright', // La position n'a plus d'importance
+            strings: { title: "Ma position" },
+            flyTo: true
+        }).addTo(map);
+        locateControl.getContainer().style.display = 'none'; // On le cache
+        document.getElementById('locate-tool-btn').addEventListener('click', function() {
+            locateControl.start();
+        });
+
+        L.control.browserPrint({position: 'topleft'}).addTo(map);
+        document.querySelector('.leaflet-control-browser-print').style.display = 'none';
+        document.getElementById('print-btn').addEventListener('click', function() {
+            document.querySelector('.leaflet-control-browser-print a').click();
+        });
+
+        var geocoder = new L.Control.Photon({
+            resultsContainer: '.photon-autocomplete',
+            placeholder: 'Rechercher une localité...'
+        });
+        geocoder.on('selected', function(e) {
+            map.setView(e.choice.geometry.coordinates.reverse(), 15);
+        });
+        geocoder.addTo(map);
+        var geocoderContainer = geocoder.getContainer();
+        document.getElementById('geocoder-container').replaceWith(geocoderContainer);
+        geocoderContainer.id = 'geocoder-container';
+
+        aboutBtn.onclick = function() { modal.style.display = "block"; }
+        span.onclick = function() { modal.style.display = "none"; }
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+
+
+        </script>        
+    </body>
+</html>
