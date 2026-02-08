@@ -35,6 +35,11 @@ body {
     font-size: 1.25rem;
     font-weight: bold;
 }
+.navbar-brand {
+    font-size: 1.25rem;
+    font-weight: bold;
+    padding-right: 15px;
+}
 .navbar-nav {
     display: flex;
     align-items: center;

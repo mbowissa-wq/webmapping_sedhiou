@@ -7,6 +7,7 @@
         <meta name="mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <link rel="stylesheet" href="css/leaflet.css">
+        <link rel="manifest" href="manifest.json">
         <link rel="stylesheet" href="css/L.Control.Locate.min.css">
         <link rel="stylesheet" href="css/qgis2web.css">
         <link rel="stylesheet" href="css/fontawesome-all.min.css">
@@ -22,27 +23,17 @@
             overflow-y: auto;
         }
         </style>
-        <title>PROJET DE CARTOGRAPHIE WEB DE LA REGION DE SEDHIOU</title>
+        <title>Carte de Sédhiou</title>
     </head>
     <body>
         <nav class="navbar">
+            <div class="navbar-brand">Web-SIG Sédhiou</div>
             <ul class="navbar-nav">
                 <li class="nav-item"><a href="#" id="home-btn" class="nav-link">Accueil</a></li>
-                <li class="nav-item dropdown">
-                    <a href="#" class="nav-link dropdown-toggle">Requêtes</a>
-                    <div class="dropdown-menu">
-                        <a href="#" id="spatial-query-btn" class="dropdown-item">Requête Spatiale</a>
-                        <a href="#" id="attribute-query-btn" class="dropdown-item">Requête Attributaire</a>
-                    </div>
-                </li>
-                <li class="nav-item dropdown">
-                    <a href="#" class="nav-link dropdown-toggle">Télécharger</a>
-                    <div class="dropdown-menu">
-                        <a href="#" id="download-csv-btn" class="dropdown-item">Format CSV</a>
-                        <a href="#" id="download-geojson-btn" class="dropdown-item">Format GeoJSON</a>
-                    </div>
-                </li>
-                <li class="nav-item"><a href="#" id="print-btn" class="nav-link">Imprimer</a></li>
+                <li class="nav-item"><a href="#" id="catalog-btn" class="nav-link">Catalogue</a></li>
+                <li class="nav-item"><a href="#" id="spatial-query-btn" class="nav-link">Requête Spatiale</a></li>
+                <li class="nav-item"><a href="#" id="attribute-query-btn" class="nav-link">Requête Attributaire</a></li>
+                <li class="nav-item"><a href="#" id="download-btn" class="nav-link">Télécharger</a></li>                <li class="nav-item"><a href="#" id="print-btn" class="nav-link">Imprimer</a></li>
                 <li class="nav-item"><a href="#" id="about-btn" class="nav-link">A propos</a></li>
                 <li class="nav-item">
                     <div id="geocoder-container" class="leaflet-photon">
@@ -64,18 +55,6 @@
         <div class="footer">
             <div id="coords-container">Coordonnées:</div>
             <div id="scale-container"></div>
-        </div>
-
-        <!-- Home Modal -->
-        <div id="home-modal" class="modal">
-            <div class="modal-content" style="width: 50%;">
-                <div class="modal-header">
-                    <span class="close-button">&times;</span>
-                    <h2>Bienvenue sur la carte de Sédhiou</h2>
-                </div>
-                <p>Cette application interactive vous permet de découvrir la région de Sédhiou à travers des cartes dynamiques et faciles à explorer.</p>
-                <p>Utilisez les menus pour afficher différentes couches de données, effectuer des requêtes ou télécharger des informations.</p>
-            </div>
         </div>
 
         <!-- Modal -->
@@ -113,6 +92,21 @@
         <script src="data/Localite_sedhiou_6.js"></script>
         <script src="data/Ecole_sedhiou_7.js"></script>
         <script>
+        // --- PWA SERVICE WORKER ---
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', function() {
+            navigator.serviceWorker.register('sw.js').then(function(registration) {
+              console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            }, function(err) {
+              console.log('ServiceWorker registration failed: ', err);
+            });
+          });
+        }
+
+        // --- MODAL LOGIC ---
+        var modal = document.getElementById("about-modal");
+        var aboutBtn = document.getElementById("about-btn");
+        var span = document.getElementsByClassName("close-button")[0];
         var highlightLayer;
         function highlightFeature(e) {
             highlightLayer = e.target;
@@ -947,16 +941,6 @@
         });
         measureControl.addTo(map);
 
-        // --- MODAL LOGIC (Home) ---
-        var homeModal = document.getElementById("home-modal");
-        var homeBtn = document.getElementById("home-btn");
-        var homeCloseBtn = homeModal.querySelector(".close-button");
-
-        // --- MODAL LOGIC (About) ---
-        var aboutModal = document.getElementById("about-modal");
-        var aboutBtn = document.getElementById("about-btn");
-        var aboutCloseBtn = aboutModal.querySelector(".close-button");
-
         // Cacher le contrôle de mesure par défaut
         var measureContainer = measureControl.getContainer();
         measureContainer.style.display = 'none';
@@ -993,21 +977,15 @@
         document.getElementById('geocoder-container').replaceWith(geocoderContainer);
         geocoderContainer.id = 'geocoder-container';
 
-        // --- MODAL EVENT LISTENERS ---
-        homeBtn.onclick = function() { 
-            homeModal.style.display = "block";
+        document.getElementById('home-btn').addEventListener('click', function() { 
             map.fitBounds([[12.416864644976814,-16.464926034426725],[13.43592465617681,-14.529668877007012]]);
-        }
+        });
+
         aboutBtn.onclick = function() { aboutModal.style.display = "block"; }
-
-        homeCloseBtn.onclick = function() { homeModal.style.display = "none"; }
-        aboutCloseBtn.onclick = function() { aboutModal.style.display = "none"; }
-
-        // Fermer les modales si on clique en dehors
+        span.onclick = function() { modal.style.display = "none"; }
         window.onclick = function(event) {
-            if (event.target == homeModal || event.target == aboutModal) {
-                homeModal.style.display = "none";
-                aboutModal.style.display = "none";
+            if (event.target == modal) {
+                modal.style.display = "none";
             }
         }
 
