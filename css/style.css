@@ -110,6 +110,17 @@ body {
 .dropdown-item:hover {
     background-color: #495057;
 }
+
+/* Styles pour le menu en grille */
+.menu-grid .dropdown-menu {
+    min-width: 320px; /* Ajustez la largeur si nécessaire */
+}
+.grid-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Crée 2 colonnes de largeur égale */
+    gap: 5px; /* Espace entre les éléments */
+}
+
 /* Footer for Coordinates and Scale */
 .footer {
     position: fixed;
