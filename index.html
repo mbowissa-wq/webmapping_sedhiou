@@ -29,17 +29,26 @@
         <nav class="navbar">
             <div class="navbar-brand">Web-SIG Sédhiou</div>
             <ul class="navbar-nav">
-                <li class="nav-item"><a href="#" id="home-btn" class="nav-link">Accueil</a></li>
-                <li class="nav-item"><a href="#" id="catalog-btn" class="nav-link">Catalogue</a></li>
-                <li class="nav-item"><a href="#" id="spatial-query-btn" class="nav-link">Requête Spatiale</a></li>
-                <li class="nav-item"><a href="#" id="attribute-query-btn" class="nav-link">Requête Attributaire</a></li>
-                <li class="nav-item"><a href="#" id="download-btn" class="nav-link">Télécharger</a></li>                <li class="nav-item"><a href="#" id="print-btn" class="nav-link">Imprimer</a></li>
-                <li class="nav-item"><a href="#" id="about-btn" class="nav-link">A propos</a></li>
-                <li class="nav-item">
+                <div class="nav-group">
+                    <li class="nav-item"><a href="#" id="home-btn" class="nav-link">Accueil</a></li>
+                    <li class="nav-item"><a href="#" id="catalog-btn" class="nav-link">Catalogue</a></li>
+                </div>
+                <div class="nav-group">
+                    <li class="nav-item"><a href="#" id="spatial-query-btn" class="nav-link">Requête Spatiale</a></li>
+                    <li class="nav-item"><a href="#" id="attribute-query-btn" class="nav-link">Requête Attributaire</a></li>
+                </div>
+                <div class="nav-group">
+                    <li class="nav-item"><a href="#" id="download-btn" class="nav-link">Télécharger</a></li>
+                    <li class="nav-item"><a href="#" id="print-btn" class="nav-link">Imprimer</a></li>
+                </div>
+                <div class="nav-group">
+                    <li class="nav-item"><a href="#" id="about-btn" class="nav-link">A propos</a></li>
+                </div>
+                <div class="nav-group">
                     <div id="geocoder-container" class="leaflet-photon">
                         <input class="photon-input" placeholder="Rechercher une localité...">
                     </div>
-                </li>
+                </div>
             </ul>
         </nav>
 
