@@ -41,20 +41,15 @@ body {
     padding-right: 15px;
 }
 .navbar-nav {
-    align-items: center;
     list-style: none;
     margin: 0;
     padding: 0;
     width: 100%;
     display: flex;
-    justify-content: space-around;
-}
-.nav-group {
-    display: flex;
     align-items: center;
 }
 .nav-item {
-    /* margin-left: 10px; */
+    margin-left: 10px;
 }
 .nav-link {
     color: #f8f9fa;

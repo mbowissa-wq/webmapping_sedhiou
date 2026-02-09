@@ -29,26 +29,27 @@
         <nav class="navbar">
             <div class="navbar-brand">Web-SIG Sédhiou</div>
             <ul class="navbar-nav">
-                <div class="nav-group">
-                    <li class="nav-item"><a href="#" id="home-btn" class="nav-link">Accueil</a></li>
-                    <li class="nav-item"><a href="#" id="catalog-btn" class="nav-link">Catalogue</a></li>
-                </div>
-                <div class="nav-group">
-                    <li class="nav-item"><a href="#" id="spatial-query-btn" class="nav-link">Requête Spatiale</a></li>
-                    <li class="nav-item"><a href="#" id="attribute-query-btn" class="nav-link">Requête Attributaire</a></li>
-                </div>
-                <div class="nav-group">
-                    <li class="nav-item"><a href="#" id="download-btn" class="nav-link">Télécharger</a></li>
-                    <li class="nav-item"><a href="#" id="print-btn" class="nav-link">Imprimer</a></li>
-                </div>
-                <div class="nav-group">
-                    <li class="nav-item"><a href="#" id="about-btn" class="nav-link">A propos</a></li>
-                </div>
-                <div class="nav-group">
+                <li class="nav-item dropdown">
+                    <a href="#" class="nav-link dropdown-toggle">Navigation</a>
+                    <div class="dropdown-menu">
+                        <a href="#" id="home-btn" class="dropdown-item">Accueil</a>
+                        <a href="#" id="catalog-btn" class="dropdown-item">Couches</a>
+                        <a href="#" id="about-btn" class="dropdown-item">A propos</a>
+                    </div>
+                </li>
+                <li class="nav-item dropdown">
+                    <a href="#" class="nav-link dropdown-toggle">Outils</a>
+                    <div class="dropdown-menu">
+                        <a href="#" id="spatial-query-btn" class="dropdown-item">Requête Spatiale</a>
+                        <a href="#" id="attribute-query-btn" class="dropdown-item">Requête Attributaire</a>
+                        <a href="#" id="download-btn" class="dropdown-item">Télécharger</a>
+                    </div>
+                </li>
+                <li class="nav-item"><a href="#" id="print-btn" class="nav-link">Imprimer</a></li>
+                <li class="nav-item">
                     <div id="geocoder-container" class="leaflet-photon">
                         <input class="photon-input" placeholder="Rechercher une localité...">
                     </div>
-                </div>
             </ul>
         </nav>
 
